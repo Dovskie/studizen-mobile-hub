@@ -93,7 +93,12 @@ export const JadwalKuliah = ({ onBackClick }: JadwalKuliahProps) => {
         const { error } = await supabase
           .from('jadwal_kuliah')
           .update({
-            ...data,
+            mata_kuliah: data.mata_kuliah,
+            hari: data.hari,
+            jam_mulai: data.jam_mulai,
+            jam_selesai: data.jam_selesai,
+            lokasi: data.lokasi || null,
+            dosen: data.dosen || null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', editingId)
@@ -110,7 +115,12 @@ export const JadwalKuliah = ({ onBackClick }: JadwalKuliahProps) => {
         const { error } = await supabase
           .from('jadwal_kuliah')
           .insert({
-            ...data,
+            mata_kuliah: data.mata_kuliah,
+            hari: data.hari,
+            jam_mulai: data.jam_mulai,
+            jam_selesai: data.jam_selesai,
+            lokasi: data.lokasi || null,
+            dosen: data.dosen || null,
             user_id: user.id,
           });
 

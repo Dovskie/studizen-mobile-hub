@@ -1,65 +1,71 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
-  Menu, Calendar, BookOpen, User, LogOut, 
-  Moon, Sun, Clock, AlertCircle 
+  Calendar, BookOpen, CheckCircle, Clock, 
+  User, Settings, LogOut, GraduationCap
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { JadwalKuliah, Tugas } from '@/types/database';
-import { toast } from '@/hooks/use-toast';
 
 interface DashboardProps {
   onJadwalClick: () => void;
   onTugasClick: () => void;
+  onProfileClick: () => void;
 }
 
-export const Dashboard = ({ onJadwalClick, onTugasClick }: DashboardProps) => {
+export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: DashboardProps) => {
   const { user, profile, signOut } = useAuth();
-  const [sideMenuOpen, setSideMenuOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
-  const [jadwalRingkasan, setJadwalRingkasan] = useState<JadwalKuliah[]>([]);
+  const [jadwalHariIni, setJadwalHariIni] = useState<JadwalKuliah[]>([]);
   const [tugasRingkasan, setTugasRingkasan] = useState<Tugas[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const hariOptions = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const hariIni = hariOptions[new Date().getDay()];
+
   useEffect(() => {
-    fetchRingkasanData();
+    fetchDashboardData();
   }, [user]);
 
-  const fetchRingkasanData = async () => {
+  const fetchDashboardData = async () => {
     if (!user) return;
     
     setLoading(true);
-    
     try {
-      // Fetch jadwal kuliah hari ini
-      const today = new Date().toLocaleDateString('id-ID', { weekday: 'long' });
-      const { data: jadwalData } = await supabase
+      // Fetch jadwal hari ini
+      const { data: jadwalData, error: jadwalError } = await supabase
         .from('jadwal_kuliah')
         .select('*')
         .eq('user_id', user.id)
-        .eq('hari', today)
-        .order('jam_mulai', { ascending: true })
-        .limit(3);
+        .eq('hari', hariIni)
+        .order('jam_mulai', { ascending: true });
 
-      // Fetch tugas yang belum selesai
-      const { data: tugasData } = await supabase
+      if (jadwalError) {
+        console.error('Error fetching jadwal:', jadwalError);
+      } else {
+        setJadwalHariIni(jadwalData || []);
+      }
+
+      // Fetch tugas ringkasan (3 tugas terdekat)
+      const { data: tugasData, error: tugasError } = await supabase
         .from('tugas')
         .select('*')
         .eq('user_id', user.id)
-        .neq('status', 'completed')
         .order('deadline', { ascending: true })
         .limit(3);
 
-      setJadwalRingkasan(jadwalData || []);
-      // Type assertion to ensure status matches our union type
-      setTugasRingkasan((tugasData || []).map(tugas => ({
-        ...tugas,
-        status: tugas.status as 'pending' | 'in_progress' | 'completed'
-      })));
+      if (tugasError) {
+        console.error('Error fetching tugas:', tugasError);
+      } else {
+        setTugasRingkasan((tugasData || []).map(tugas => ({
+          ...tugas,
+          status: tugas.status as 'pending' | 'in_progress' | 'completed'
+        })));
+      }
     } catch (error) {
-      console.error('Error fetching ringkasan data:', error);
+      console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }
@@ -68,234 +74,177 @@ export const Dashboard = ({ onJadwalClick, onTugasClick }: DashboardProps) => {
   const handleLogout = async () => {
     try {
       await signOut();
-      toast({
-        title: "Logout Berhasil",
-        description: "Sampai jumpa lagi!",
-      });
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Gagal logout",
-      });
+      console.error('Error signing out:', error);
     }
   };
 
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    document.documentElement.classList.toggle('dark');
-  };
-
   return (
-    <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-indigo-100'}`}>
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm p-4">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
+            <div className="bg-blue-600 p-3 rounded-full">
+              <GraduationCap className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
+              <p className="text-gray-600">
+                Selamat datang, {profile?.full_name || profile?.username || user?.email}!
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSideMenuOpen(true)}
+              onClick={onProfileClick}
+              className="text-gray-600 hover:text-gray-800"
             >
-              <Menu className="h-5 w-5" />
+              <Settings className="h-4 w-4 mr-2" />
+              Profile
             </Button>
-            <h1 className="text-xl font-semibold text-gray-800 dark:text-white">
-              Dashboard
-            </h1>
-          </div>
-          
-          <div className="text-sm text-gray-600 dark:text-gray-300">
-            Selamat datang, {profile?.username || 'Mahasiswa'}!
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="text-gray-600 hover:text-gray-800"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
           </div>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="p-4 space-y-6">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 gap-4">
-          <Card className="bg-white dark:bg-gray-800">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded-lg">
-                  <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Jadwal Hari Ini</p>
-                  <p className="text-lg font-semibold dark:text-white">{jadwalRingkasan.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white dark:bg-gray-800">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-orange-100 dark:bg-orange-900 p-2 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Tugas Aktif</p>
-                  <p className="text-lg font-semibold dark:text-white">{tugasRingkasan.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Jadwal Kuliah Ringkasan */}
-        <Card className="bg-white dark:bg-gray-800">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Jadwal Kuliah Hari Ini
-              </span>
-              <Button variant="outline" size="sm" onClick={onJadwalClick}>
-                Lihat Semua
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <p className="text-gray-500 dark:text-gray-400">Loading...</p>
-            ) : jadwalRingkasan.length > 0 ? (
-              <div className="space-y-3">
-                {jadwalRingkasan.map((jadwal) => (
-                  <div key={jadwal.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <div className="flex-1">
-                      <p className="font-medium dark:text-white">{jadwal.mata_kuliah}</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {jadwal.jam_mulai} - {jadwal.jam_selesai}
-                        {jadwal.lokasi && ` • ${jadwal.lokasi}`}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 dark:text-gray-400 text-center py-4">
-                Tidak ada jadwal kuliah hari ini
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Tugas Ringkasan */}
-        <Card className="bg-white dark:bg-gray-800">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5" />
-                Tugas Terbaru
-              </span>
-              <Button variant="outline" size="sm" onClick={onTugasClick}>
-                Lihat Semua
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <p className="text-gray-500 dark:text-gray-400">Loading...</p>
-            ) : tugasRingkasan.length > 0 ? (
-              <div className="space-y-3">
-                {tugasRingkasan.map((tugas) => (
-                  <div key={tugas.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                    <div className="flex-1">
-                      <p className="font-medium dark:text-white">{tugas.judul}</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {tugas.mata_kuliah} • {tugas.nama_dosen}
-                      </p>
-                      <p className="text-xs text-orange-600 dark:text-orange-400">
-                        Deadline: {new Date(tugas.deadline).toLocaleDateString('id-ID')}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 dark:text-gray-400 text-center py-4">
-                Tidak ada tugas aktif
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Side Menu Overlay */}
-      {sideMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50"
-          onClick={() => setSideMenuOpen(false)}
-        >
-          <div
-            className="bg-white dark:bg-gray-800 w-80 h-full shadow-lg transform transition-transform"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 border-b dark:border-gray-700">
-              <h2 className="text-lg font-semibold dark:text-white">Menu</h2>
-            </div>
-            
-            <div className="p-4 space-y-2">
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3"
-                onClick={() => {
-                  setSideMenuOpen(false);
-                  // Navigate to profile
-                }}
-              >
-                <User className="h-5 w-5" />
-                Profil
-              </Button>
-              
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3"
-                onClick={() => {
-                  setSideMenuOpen(false);
-                  onJadwalClick();
-                }}
-              >
-                <Calendar className="h-5 w-5" />
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={onJadwalClick}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-600" />
                 Jadwal Kuliah
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600">Kelola jadwal kuliah mingguan Anda</p>
+              <Button className="mt-4 bg-blue-600 hover:bg-blue-700">
+                Buka Jadwal
               </Button>
-              
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3"
-                onClick={() => {
-                  setSideMenuOpen(false);
-                  onTugasClick();
-                }}
-              >
-                <BookOpen className="h-5 w-5" />
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={onTugasClick}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-green-600" />
                 Tugas Kuliah
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600">Pantau dan kelola tugas kuliah Anda</p>
+              <Button className="mt-4 bg-green-600 hover:bg-green-700">
+                Buka Tugas
               </Button>
-              
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3"
-                onClick={toggleDarkMode}
-              >
-                {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                {darkMode ? 'Light Mode' : 'Dark Mode'}
-              </Button>
-              
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 text-red-600 hover:text-red-700 hover:bg-red-50"
-                onClick={handleLogout}
-              >
-                <LogOut className="h-5 w-5" />
-                Logout
-              </Button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
-      )}
+
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Memuat data...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Jadwal Hari Ini */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Jadwal Hari Ini ({hariIni})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {jadwalHariIni.length > 0 ? (
+                  <div className="space-y-3">
+                    {jadwalHariIni.map((jadwal) => (
+                      <div key={jadwal.id} className="p-3 bg-blue-50 rounded-lg">
+                        <h4 className="font-semibold text-gray-800">{jadwal.mata_kuliah}</h4>
+                        <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {jadwal.jam_mulai} - {jadwal.jam_selesai}
+                          </div>
+                          {jadwal.lokasi && (
+                            <span>📍 {jadwal.lokasi}</span>
+                          )}
+                        </div>
+                        {jadwal.dosen && (
+                          <div className="flex items-center gap-1 mt-1 text-sm text-gray-600">
+                            <User className="h-3 w-3" />
+                            {jadwal.dosen}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">
+                    Tidak ada jadwal kuliah hari ini
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Tugas Mendatang */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5" />
+                  Tugas Mendatang
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {tugasRingkasan.length > 0 ? (
+                  <div className="space-y-3">
+                    {tugasRingkasan.map((tugas) => (
+                      <div key={tugas.id} className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-800">{tugas.judul}</h4>
+                            <p className="text-sm text-gray-600">{tugas.mata_kuliah}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Clock className="h-3 w-3 text-gray-500" />
+                              <span className="text-xs text-gray-500">
+                                {new Date(tugas.deadline).toLocaleDateString('id-ID')}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {tugas.status === 'completed' ? (
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <div className={`h-2 w-2 rounded-full ${
+                                tugas.status === 'in_progress' ? 'bg-blue-500' : 'bg-yellow-500'
+                              }`} />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">
+                    Tidak ada tugas yang perlu dikerjakan
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

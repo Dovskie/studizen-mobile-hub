@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -9,13 +10,16 @@ import { WelcomePage } from '@/components/WelcomePage';
 import { LoginPage } from '@/components/LoginPage';
 import { RegisterPage } from '@/components/RegisterPage';
 import { VerificationPage } from '@/components/VerificationPage';
+import { ForgotPasswordPage } from '@/components/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/components/ResetPasswordPage';
 import { Dashboard } from '@/components/Dashboard';
 import { JadwalKuliah } from '@/components/JadwalKuliah';
 import { TugasKuliah } from '@/components/TugasKuliah';
+import { ProfilePage } from '@/components/ProfilePage';
 
 const queryClient = new QueryClient();
 
-type Page = 'welcome' | 'login' | 'register' | 'verification' | 'dashboard' | 'jadwal' | 'tugas';
+type Page = 'welcome' | 'login' | 'register' | 'verification' | 'forgot-password' | 'reset-password' | 'dashboard' | 'jadwal' | 'tugas' | 'profile';
 
 const AppContent = () => {
   const { user, loading } = useAuth();
@@ -24,6 +28,16 @@ const AppContent = () => {
 
   useEffect(() => {
     if (!loading) {
+      // Check if we're coming from a password reset link
+      const urlParams = new URLSearchParams(window.location.search);
+      const accessToken = urlParams.get('access_token');
+      const type = urlParams.get('type');
+      
+      if (accessToken && type === 'recovery') {
+        setCurrentPage('reset-password');
+        return;
+      }
+
       if (user) {
         setCurrentPage('dashboard');
       } else {
@@ -57,10 +71,7 @@ const AppContent = () => {
         return (
           <LoginPage
             onBackClick={() => setCurrentPage('welcome')}
-            onForgotPasswordClick={() => {
-              // Handle forgot password
-              console.log('Forgot password clicked');
-            }}
+            onForgotPasswordClick={() => setCurrentPage('forgot-password')}
             onLoginSuccess={() => setCurrentPage('dashboard')}
           />
         );
@@ -85,11 +96,26 @@ const AppContent = () => {
           />
         );
       
+      case 'forgot-password':
+        return (
+          <ForgotPasswordPage
+            onBackClick={() => setCurrentPage('login')}
+          />
+        );
+      
+      case 'reset-password':
+        return (
+          <ResetPasswordPage
+            onResetSuccess={() => setCurrentPage('dashboard')}
+          />
+        );
+      
       case 'dashboard':
         return (
           <Dashboard
             onJadwalClick={() => setCurrentPage('jadwal')}
             onTugasClick={() => setCurrentPage('tugas')}
+            onProfileClick={() => setCurrentPage('profile')}
           />
         );
       
@@ -103,6 +129,13 @@ const AppContent = () => {
       case 'tugas':
         return (
           <TugasKuliah
+            onBackClick={() => setCurrentPage('dashboard')}
+          />
+        );
+      
+      case 'profile':
+        return (
+          <ProfilePage
             onBackClick={() => setCurrentPage('dashboard')}
           />
         );

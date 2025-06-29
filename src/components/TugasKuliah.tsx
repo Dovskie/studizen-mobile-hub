@@ -7,9 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { 
-  ArrowLeft, Plus, Edit2, Trash2, BookOpen, Calendar, 
-  User, Save, X, AlertCircle, CheckCircle, Clock
+  ArrowLeft, Plus, Edit2, Trash2, BookOpen, Clock, 
+  User, Save, X, CheckCircle, Circle, AlertCircle 
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,10 +19,10 @@ import { toast } from '@/hooks/use-toast';
 
 const tugasSchema = z.object({
   judul: z.string().min(1, 'Judul tugas wajib diisi'),
-  deskripsi: z.string().optional(),
   mata_kuliah: z.string().min(1, 'Mata kuliah wajib diisi'),
   nama_dosen: z.string().min(1, 'Nama dosen wajib diisi'),
   deadline: z.string().min(1, 'Deadline wajib diisi'),
+  deskripsi: z.string().optional(),
   status: z.enum(['pending', 'in_progress', 'completed']),
 });
 
@@ -38,7 +39,7 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
 
   const {
     register,
@@ -54,9 +55,9 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
   });
 
   const statusOptions = [
-    { value: 'pending', label: 'Belum Dikerjakan', icon: AlertCircle, color: 'text-red-600' },
-    { value: 'in_progress', label: 'Sedang Dikerjakan', icon: Clock, color: 'text-yellow-600' },
-    { value: 'completed', label: 'Selesai', icon: CheckCircle, color: 'text-green-600' },
+    { value: 'pending', label: 'Pending', color: 'text-yellow-600' },
+    { value: 'in_progress', label: 'In Progress', color: 'text-blue-600' },
+    { value: 'completed', label: 'Completed', color: 'text-green-600' },
   ];
 
   useEffect(() => {
@@ -75,18 +76,13 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
         .order('deadline', { ascending: true });
 
       if (error) throw error;
-      
-      // Type assertion to ensure status matches our union type
-      setTugasList((data || []).map(tugas => ({
-        ...tugas,
-        status: tugas.status as 'pending' | 'in_progress' | 'completed'
-      })));
+      setTugasList(data || []);
     } catch (error) {
       console.error('Error fetching tugas:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Gagal memuat tugas kuliah",
+        description: "Gagal memuat daftar tugas",
       });
     } finally {
       setLoading(false);
@@ -103,7 +99,12 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
         const { error } = await supabase
           .from('tugas')
           .update({
-            ...data,
+            judul: data.judul,
+            mata_kuliah: data.mata_kuliah,
+            nama_dosen: data.nama_dosen,
+            deadline: data.deadline,
+            deskripsi: data.deskripsi || null,
+            status: data.status,
             updated_at: new Date().toISOString(),
           })
           .eq('id', editingId)
@@ -120,7 +121,12 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
         const { error } = await supabase
           .from('tugas')
           .insert({
-            ...data,
+            judul: data.judul,
+            mata_kuliah: data.mata_kuliah,
+            nama_dosen: data.nama_dosen,
+            deadline: data.deadline,
+            deskripsi: data.deskripsi || null,
+            status: data.status,
             user_id: user.id,
           });
 
@@ -149,11 +155,11 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
   const handleEdit = (tugas: Tugas) => {
     setEditingId(tugas.id);
     setValue('judul', tugas.judul);
-    setValue('deskripsi', tugas.deskripsi || '');
     setValue('mata_kuliah', tugas.mata_kuliah);
     setValue('nama_dosen', tugas.nama_dosen);
     setValue('deadline', tugas.deadline);
-    setValue('status', tugas.status);
+    setValue('deskripsi', tugas.deskripsi || '');
+    setValue('status', tugas.status as 'pending' | 'in_progress' | 'completed');
     setShowForm(true);
   };
 
@@ -185,53 +191,30 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
     }
   };
 
-  const handleStatusChange = async (id: string, newStatus: 'pending' | 'in_progress' | 'completed') => {
-    if (!user) return;
-    
-    try {
-      const { error } = await supabase
-        .from('tugas')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Berhasil",
-        description: "Status tugas berhasil diperbarui",
-      });
-
-      fetchTugas();
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Gagal memperbarui status tugas",
-      });
-    }
-  };
-
   const resetForm = () => {
     reset();
     setEditingId(null);
     setShowForm(false);
   };
 
-  const filteredTugas = filterStatus === 'all' 
-    ? tugasList 
-    : tugasList.filter(tugas => tugas.status === filterStatus);
+  const filteredTugas = tugasList.filter(tugas => {
+    if (statusFilter === 'all') return true;
+    return tugas.status === statusFilter;
+  });
 
-  const getStatusInfo = (status: string) => {
-    return statusOptions.find(option => option.value === status) || statusOptions[0];
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'in_progress':
+        return <Circle className="h-4 w-4 text-blue-600" />;
+      default:
+        return <Circle className="h-4 w-4 text-yellow-600" />;
+    }
   };
 
   const isOverdue = (deadline: string) => {
-    return new Date(deadline) < new Date() && Date.now() > new Date(deadline).getTime();
+    return new Date(deadline) < new Date() && deadline !== '';
   };
 
   return (
@@ -253,27 +236,26 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
         </div>
 
         {/* Filter */}
-        <div className="flex gap-2 mb-6 overflow-x-auto">
-          <Button
-            variant={filterStatus === 'all' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilterStatus('all')}
-          >
-            Semua ({tugasList.length})
-          </Button>
-          {statusOptions.map(status => {
-            const count = tugasList.filter(tugas => tugas.status === status.value).length;
-            return (
+        <div className="mb-6">
+          <div className="flex gap-2">
+            <Button
+              variant={statusFilter === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setStatusFilter('all')}
+            >
+              Semua
+            </Button>
+            {statusOptions.map(option => (
               <Button
-                key={status.value}
-                variant={filterStatus === status.value ? 'default' : 'outline'}
+                key={option.value}
+                variant={statusFilter === option.value ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setFilterStatus(status.value as any)}
+                onClick={() => setStatusFilter(option.value as any)}
               >
-                {status.label} ({count})
+                {option.label}
               </Button>
-            );
-          })}
+            ))}
+          </div>
         </div>
 
         {/* Form */}
@@ -294,11 +276,11 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
             <CardContent>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2 md:col-span-2">
+                  <div className="space-y-2">
                     <Label htmlFor="judul">Judul Tugas</Label>
                     <Input
                       id="judul"
-                      placeholder="contoh: Essay tentang Pemrograman Web"
+                      placeholder="contoh: Essay Pemrograman Web"
                       {...register('judul')}
                     />
                     {errors.judul && (
@@ -349,23 +331,26 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                       {...register('status')}
                     >
-                      {statusOptions.map(status => (
-                        <option key={status.value} value={status.value}>
-                          {status.label}
+                      {statusOptions.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
+                    {errors.status && (
+                      <p className="text-sm text-red-600">{errors.status.message}</p>
+                    )}
                   </div>
+                </div>
 
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="deskripsi">Deskripsi (Opsional)</Label>
-                    <textarea
-                      id="deskripsi"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md h-24"
-                      placeholder="Deskripsi tugas..."
-                      {...register('deskripsi')}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="deskripsi">Deskripsi (Opsional)</Label>
+                  <Textarea
+                    id="deskripsi"
+                    placeholder="Deskripsi tugas..."
+                    rows={3}
+                    {...register('deskripsi')}
+                  />
                 </div>
 
                 <div className="flex gap-2 pt-4">
@@ -399,93 +384,71 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
         ) : (
           <div className="space-y-4">
             {filteredTugas.length > 0 ? (
-              filteredTugas.map((tugas) => {
-                const statusInfo = getStatusInfo(tugas.status);
-                const StatusIcon = statusInfo.icon;
-                const overdue = isOverdue(tugas.deadline) && tugas.status !== 'completed';
-                
-                return (
-                  <Card key={tugas.id} className={overdue ? 'border-red-200 bg-red-50' : ''}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <StatusIcon className={`h-4 w-4 ${statusInfo.color}`} />
-                            <h3 className="font-semibold text-gray-800">
-                              {tugas.judul}
-                            </h3>
-                            {overdue && (
-                              <span className="text-xs bg-red-500 text-white px-2 py-1 rounded">
-                                TERLAMBAT
-                              </span>
+              filteredTugas.map((tugas) => (
+                <Card key={tugas.id} className={isOverdue(tugas.deadline) && tugas.status !== 'completed' ? 'border-red-200 bg-red-50' : ''}>
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          {getStatusIcon(tugas.status)}
+                          <h3 className="font-semibold text-gray-800">{tugas.judul}</h3>
+                          {isOverdue(tugas.deadline) && tugas.status !== 'completed' && (
+                            <AlertCircle className="h-4 w-4 text-red-600" />
+                          )}
+                        </div>
+                        
+                        <div className="space-y-1 text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <BookOpen className="h-4 w-4" />
+                            {tugas.mata_kuliah}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <User className="h-4 w-4" />
+                            {tugas.nama_dosen}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-4 w-4" />
+                            {new Date(tugas.deadline).toLocaleDateString('id-ID')}
+                            {isOverdue(tugas.deadline) && tugas.status !== 'completed' && (
+                              <span className="text-red-600 font-medium">(Terlambat)</span>
                             )}
                           </div>
-                          
-                          <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
-                            <div className="flex items-center gap-1">
-                              <BookOpen className="h-4 w-4" />
-                              {tugas.mata_kuliah}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <User className="h-4 w-4" />
-                              {tugas.nama_dosen}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              {new Date(tugas.deadline).toLocaleDateString('id-ID')}
-                            </div>
-                          </div>
-
-                          {tugas.deskripsi && (
-                            <p className="text-sm text-gray-600 mb-3">
-                              {tugas.deskripsi}
-                            </p>
-                          )}
-
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={tugas.status}
-                              onChange={(e) => handleStatusChange(tugas.id, e.target.value as any)}
-                              className="text-xs px-2 py-1 border border-gray-300 rounded"
-                            >
-                              {statusOptions.map(status => (
-                                <option key={status.value} value={status.value}>
-                                  {status.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
                         </div>
-
-                        <div className="flex items-center gap-2 ml-4">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(tugas)}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(tugas.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        
+                        {tugas.deskripsi && (
+                          <p className="mt-2 text-sm text-gray-700">{tugas.deskripsi}</p>
+                        )}
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })
+                      
+                      <div className="flex items-center gap-2 ml-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(tugas)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(tugas.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
             ) : (
-              <div className="text-center py-8">
-                <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">
-                  {filterStatus === 'all' ? 'Belum ada tugas' : `Tidak ada tugas dengan status ${statusOptions.find(s => s.value === filterStatus)?.label.toLowerCase()}`}
-                </p>
-              </div>
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <p className="text-gray-500">
+                    {statusFilter === 'all' ? 'Belum ada tugas' : `Tidak ada tugas dengan status ${statusFilter}`}
+                  </p>
+                </CardContent>
+              </Card>
             )}
           </div>
         )}
