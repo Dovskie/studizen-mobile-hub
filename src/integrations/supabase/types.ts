@@ -9,7 +9,147 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      jadwal_kuliah: {
+        Row: {
+          created_at: string | null
+          dosen: string | null
+          hari: string
+          id: string
+          jam_mulai: string
+          jam_selesai: string
+          lokasi: string | null
+          mata_kuliah: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          dosen?: string | null
+          hari: string
+          id?: string
+          jam_mulai: string
+          jam_selesai: string
+          lokasi?: string | null
+          mata_kuliah: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          dosen?: string | null
+          hari?: string
+          id?: string
+          jam_mulai?: string
+          jam_selesai?: string
+          lokasi?: string | null
+          mata_kuliah?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      otp_verifications: {
+        Row: {
+          created_at: string | null
+          email: string
+          expires_at: string
+          id: string
+          is_used: boolean | null
+          otp_code: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          expires_at: string
+          id?: string
+          is_used?: boolean | null
+          otp_code: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          is_used?: boolean | null
+          otp_code?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+          is_verified: boolean | null
+          provider: string | null
+          updated_at: string | null
+          username: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id: string
+          is_verified?: boolean | null
+          provider?: string | null
+          updated_at?: string | null
+          username?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_verified?: boolean | null
+          provider?: string | null
+          updated_at?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
+      tugas: {
+        Row: {
+          created_at: string | null
+          deadline: string
+          deskripsi: string | null
+          id: string
+          judul: string
+          mata_kuliah: string
+          nama_dosen: string
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          deadline: string
+          deskripsi?: string | null
+          id?: string
+          judul: string
+          mata_kuliah: string
+          nama_dosen: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          deadline?: string
+          deskripsi?: string | null
+          id?: string
+          judul?: string
+          mata_kuliah?: string
+          nama_dosen?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
