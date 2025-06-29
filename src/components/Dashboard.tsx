@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,7 +53,11 @@ export const Dashboard = ({ onJadwalClick, onTugasClick }: DashboardProps) => {
         .limit(3);
 
       setJadwalRingkasan(jadwalData || []);
-      setTugasRingkasan(tugasData || []);
+      // Type assertion to ensure status matches our union type
+      setTugasRingkasan((tugasData || []).map(tugas => ({
+        ...tugas,
+        status: tugas.status as 'pending' | 'in_progress' | 'completed'
+      })));
     } catch (error) {
       console.error('Error fetching ringkasan data:', error);
     } finally {
