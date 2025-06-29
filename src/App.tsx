@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -11,6 +10,8 @@ import { LoginPage } from '@/components/LoginPage';
 import { RegisterPage } from '@/components/RegisterPage';
 import { VerificationPage } from '@/components/VerificationPage';
 import { Dashboard } from '@/components/Dashboard';
+import { JadwalKuliah } from '@/components/JadwalKuliah';
+import { TugasKuliah } from '@/components/TugasKuliah';
 
 const queryClient = new QueryClient();
 
@@ -94,34 +95,16 @@ const AppContent = () => {
       
       case 'jadwal':
         return (
-          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-            <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
-              <h1 className="text-2xl font-bold mb-4">Jadwal Kuliah</h1>
-              <p className="text-gray-600 mb-4">Halaman jadwal kuliah akan segera hadir...</p>
-              <button
-                onClick={() => setCurrentPage('dashboard')}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
-                Kembali ke Dashboard
-              </button>
-            </div>
-          </div>
+          <JadwalKuliah
+            onBackClick={() => setCurrentPage('dashboard')}
+          />
         );
       
       case 'tugas':
         return (
-          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-            <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
-              <h1 className="text-2xl font-bold mb-4">Tugas Kuliah</h1>
-              <p className="text-gray-600 mb-4">Halaman tugas kuliah akan segera hadir...</p>
-              <button
-                onClick={() => setCurrentPage('dashboard')}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
-                Kembali ke Dashboard
-              </button>
-            </div>
-          </div>
+          <TugasKuliah
+            onBackClick={() => setCurrentPage('dashboard')}
+          />
         );
       
       default:
