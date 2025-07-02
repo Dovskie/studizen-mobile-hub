@@ -6,11 +6,15 @@ import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { 
-  ArrowLeft, Plus, Edit2, Trash2, BookOpen, Clock, 
-  User, Save, X, CheckCircle, Circle, AlertCircle 
+  ArrowLeft, Plus, Edit, Trash2, Calendar, 
+  BookOpen, CheckCircle, Clock, AlertTriangle, User
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,10 +23,10 @@ import { toast } from '@/hooks/use-toast';
 
 const tugasSchema = z.object({
   judul: z.string().min(1, 'Judul tugas wajib diisi'),
+  deskripsi: z.string().optional(),
   mata_kuliah: z.string().min(1, 'Mata kuliah wajib diisi'),
   nama_dosen: z.string().min(1, 'Nama dosen wajib diisi'),
   deadline: z.string().min(1, 'Deadline wajib diisi'),
-  deskripsi: z.string().optional(),
   status: z.enum(['pending', 'in_progress', 'completed']),
 });
 
@@ -34,34 +38,28 @@ interface TugasKuliahProps {
 
 export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
   const { user } = useAuth();
-  const [tugasList, setTugasList] = useState<Tugas[]>([]);
+  const [tugas, setTugas] = useState<Tugas[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
+  const [selectedTugas, setSelectedTugas] = useState<Tugas | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'semua' | 'pending' | 'in_progress' | 'completed'>('semua');
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    formState: { errors },
-  } = useForm<TugasForm>({
+  const form = useForm<TugasForm>({
     resolver: zodResolver(tugasSchema),
     defaultValues: {
+      judul: '',
+      deskripsi: '',
+      mata_kuliah: '',
+      nama_dosen: '',
+      deadline: '',
       status: 'pending',
     },
   });
 
-  const statusOptions = [
-    { value: 'pending', label: 'Pending', color: 'text-yellow-600' },
-    { value: 'in_progress', label: 'In Progress', color: 'text-blue-600' },
-    { value: 'completed', label: 'Completed', color: 'text-green-600' },
-  ];
-
   useEffect(() => {
-    fetchTugas();
+    if (user) {
+      fetchTugas();
+    }
   }, [user]);
 
   const fetchTugas = async () => {
@@ -76,13 +74,20 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
         .order('deadline', { ascending: true });
 
       if (error) throw error;
-      setTugasList(data || []);
+
+      // Type casting untuk memastikan status sesuai dengan type yang diharapkan
+      const typedTugas: Tugas[] = (data || []).map(tugas => ({
+        ...tugas,
+        status: tugas.status as 'pending' | 'in_progress' | 'completed'
+      }));
+
+      setTugas(typedTugas);
     } catch (error) {
       console.error('Error fetching tugas:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Gagal memuat daftar tugas",
+        description: "Gagal memuat data tugas",
       });
     } finally {
       setLoading(false);
@@ -91,24 +96,17 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
 
   const onSubmit = async (data: TugasForm) => {
     if (!user) return;
-    
-    setSubmitting(true);
+
     try {
-      if (editingId) {
+      if (selectedTugas) {
         // Update existing tugas
         const { error } = await supabase
           .from('tugas')
           .update({
-            judul: data.judul,
-            mata_kuliah: data.mata_kuliah,
-            nama_dosen: data.nama_dosen,
-            deadline: data.deadline,
-            deskripsi: data.deskripsi || null,
-            status: data.status,
+            ...data,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', editingId)
-          .eq('user_id', user.id);
+          .eq('id', selectedTugas.id);
 
         if (error) throw error;
 
@@ -120,15 +118,10 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
         // Create new tugas
         const { error } = await supabase
           .from('tugas')
-          .insert({
-            judul: data.judul,
-            mata_kuliah: data.mata_kuliah,
-            nama_dosen: data.nama_dosen,
-            deadline: data.deadline,
-            deskripsi: data.deskripsi || null,
-            status: data.status,
+          .insert([{
+            ...data,
             user_id: user.id,
-          });
+          }]);
 
         if (error) throw error;
 
@@ -138,7 +131,9 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
         });
       }
 
-      resetForm();
+      form.reset();
+      setSelectedTugas(null);
+      setIsDialogOpen(false);
       fetchTugas();
     } catch (error) {
       console.error('Error saving tugas:', error);
@@ -147,31 +142,30 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
         title: "Error",
         description: "Gagal menyimpan tugas",
       });
-    } finally {
-      setSubmitting(false);
     }
   };
 
-  const handleEdit = (tugas: Tugas) => {
-    setEditingId(tugas.id);
-    setValue('judul', tugas.judul);
-    setValue('mata_kuliah', tugas.mata_kuliah);
-    setValue('nama_dosen', tugas.nama_dosen);
-    setValue('deadline', tugas.deadline);
-    setValue('deskripsi', tugas.deskripsi || '');
-    setValue('status', tugas.status as 'pending' | 'in_progress' | 'completed');
-    setShowForm(true);
+  const handleEdit = (tugasItem: Tugas) => {
+    setSelectedTugas(tugasItem);
+    form.reset({
+      judul: tugasItem.judul,
+      deskripsi: tugasItem.deskripsi || '',
+      mata_kuliah: tugasItem.mata_kuliah,
+      nama_dosen: tugasItem.nama_dosen,
+      deadline: tugasItem.deadline,
+      status: tugasItem.status,
+    });
+    setIsDialogOpen(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (!user) return;
-    
+    if (!confirm('Apakah Anda yakin ingin menghapus tugas ini?')) return;
+
     try {
       const { error } = await supabase
         .from('tugas')
         .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('id', id);
 
       if (error) throw error;
 
@@ -191,264 +185,268 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
     }
   };
 
-  const resetForm = () => {
-    reset();
-    setEditingId(null);
-    setShowForm(false);
+  const handleNewTugas = () => {
+    setSelectedTugas(null);
+    form.reset({
+      judul: '',
+      deskripsi: '',
+      mata_kuliah: '',
+      nama_dosen: '',
+      deadline: '',
+      status: 'pending',
+    });
+    setIsDialogOpen(true);
   };
 
-  const filteredTugas = tugasList.filter(tugas => {
-    if (statusFilter === 'all') return true;
-    return tugas.status === statusFilter;
-  });
-
-  const getStatusIcon = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
+        return <Badge className="bg-green-100 text-green-800">Selesai</Badge>;
       case 'in_progress':
-        return <Circle className="h-4 w-4 text-blue-600" />;
+        return <Badge className="bg-blue-100 text-blue-800">Sedang Dikerjakan</Badge>;
+      case 'pending':
+        return <Badge className="bg-yellow-100 text-yellow-800">Menunggu</Badge>;
       default:
-        return <Circle className="h-4 w-4 text-yellow-600" />;
+        return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>;
     }
   };
 
+  const getFilteredTugas = () => {
+    if (activeTab === 'semua') return tugas;
+    return tugas.filter(t => t.status === activeTab);
+  };
+
   const isOverdue = (deadline: string) => {
-    return new Date(deadline) < new Date() && deadline !== '';
+    return new Date(deadline) < new Date() && new Date(deadline).toDateString() !== new Date().toDateString();
+  };
+
+  const isDueToday = (deadline: string) => {
+    return new Date(deadline).toDateString() === new Date().toDateString();
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="sm" onClick={onBackClick}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-2xl font-bold text-gray-800">Tugas Kuliah</h1>
-          <Button
-            onClick={() => setShowForm(!showForm)}
-            className="ml-auto bg-blue-600 hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Tambah Tugas
-          </Button>
-        </div>
-
-        {/* Filter */}
-        <div className="mb-6">
-          <div className="flex gap-2">
-            <Button
-              variant={statusFilter === 'all' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter('all')}
-            >
-              Semua
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={onBackClick}>
+              <ArrowLeft className="h-4 w-4" />
             </Button>
-            {statusOptions.map(option => (
-              <Button
-                key={option.value}
-                variant={statusFilter === option.value ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setStatusFilter(option.value as any)}
-              >
-                {option.label}
-              </Button>
-            ))}
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800">Tugas Kuliah</h1>
+              <p className="text-gray-600">Kelola tugas kuliah Anda</p>
+            </div>
           </div>
-        </div>
-
-        {/* Form */}
-        {showForm && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                {editingId ? 'Edit Tugas' : 'Tambah Tugas'}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={resetForm}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="judul">Judul Tugas</Label>
-                    <Input
-                      id="judul"
-                      placeholder="contoh: Essay Pemrograman Web"
-                      {...register('judul')}
-                    />
-                    {errors.judul && (
-                      <p className="text-sm text-red-600">{errors.judul.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="mata_kuliah">Mata Kuliah</Label>
-                    <Input
-                      id="mata_kuliah"
-                      placeholder="contoh: Pemrograman Web"
-                      {...register('mata_kuliah')}
-                    />
-                    {errors.mata_kuliah && (
-                      <p className="text-sm text-red-600">{errors.mata_kuliah.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="nama_dosen">Nama Dosen</Label>
-                    <Input
-                      id="nama_dosen"
-                      placeholder="contoh: Dr. John Doe"
-                      {...register('nama_dosen')}
-                    />
-                    {errors.nama_dosen && (
-                      <p className="text-sm text-red-600">{errors.nama_dosen.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="deadline">Deadline</Label>
-                    <Input
-                      id="deadline"
-                      type="date"
-                      {...register('deadline')}
-                    />
-                    {errors.deadline && (
-                      <p className="text-sm text-red-600">{errors.deadline.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
-                    <select
-                      id="status"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      {...register('status')}
-                    >
-                      {statusOptions.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.status && (
-                      <p className="text-sm text-red-600">{errors.status.message}</p>
-                    )}
-                  </div>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={handleNewTugas} className="bg-green-600 hover:bg-green-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Tugas
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>
+                  {selectedTugas ? 'Edit Tugas' : 'Tambah Tugas Baru'}
+                </DialogTitle>
+              </DialogHeader>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="judul">Judul Tugas</Label>
+                  <Input
+                    id="judul"
+                    placeholder="masukkan judul tugas"
+                    {...form.register('judul')}
+                  />
+                  {form.formState.errors.judul && (
+                    <p className="text-sm text-red-600">
+                      {form.formState.errors.judul.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="deskripsi">Deskripsi (Opsional)</Label>
                   <Textarea
                     id="deskripsi"
-                    placeholder="Deskripsi tugas..."
-                    rows={3}
-                    {...register('deskripsi')}
+                    placeholder="deskripsi tugas"
+                    {...form.register('deskripsi')}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="mata_kuliah">Mata Kuliah</Label>
+                  <Input
+                    id="mata_kuliah"
+                    placeholder="nama mata kuliah"
+                    {...form.register('mata_kuliah')}
+                  />
+                  {form.formState.errors.mata_kuliah && (
+                    <p className="text-sm text-red-600">
+                      {form.formState.errors.mata_kuliah.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="nama_dosen">Nama Dosen</Label>
+                  <Input
+                    id="nama_dosen"
+                    placeholder="nama dosen"
+                    {...form.register('nama_dosen')}
+                  />
+                  {form.formState.errors.nama_dosen && (
+                    <p className="text-sm text-red-600">
+                      {form.formState.errors.nama_dosen.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="deadline">Deadline</Label>
+                  <Input
+                    id="deadline"
+                    type="date"
+                    {...form.register('deadline')}
+                  />
+                  {form.formState.errors.deadline && (
+                    <p className="text-sm text-red-600">
+                      {form.formState.errors.deadline.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={form.watch('status')}
+                    onValueChange={(value: 'pending' | 'in_progress' | 'completed') => 
+                      form.setValue('status', value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Menunggu</SelectItem>
+                      <SelectItem value="in_progress">Sedang Dikerjakan</SelectItem>
+                      <SelectItem value="completed">Selesai</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex gap-2 pt-4">
                   <Button
-                    type="submit"
-                    disabled={submitting}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {submitting ? 'Menyimpan...' : (editingId ? 'Update' : 'Simpan')}
-                  </Button>
-                  <Button
                     type="button"
                     variant="outline"
-                    onClick={resetForm}
+                    onClick={() => setIsDialogOpen(false)}
+                    className="flex-1"
                   >
                     Batal
                   </Button>
+                  <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700">
+                    {selectedTugas ? 'Perbarui' : 'Simpan'}
+                  </Button>
                 </div>
               </form>
-            </CardContent>
-          </Card>
-        )}
+            </DialogContent>
+          </Dialog>
+        </div>
 
-        {/* Tugas List */}
+        {/* Filter Tabs */}
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="mb-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="semua">Semua ({tugas.length})</TabsTrigger>
+            <TabsTrigger value="pending">
+              Menunggu ({tugas.filter(t => t.status === 'pending').length})
+            </TabsTrigger>
+            <TabsTrigger value="in_progress">
+              Dikerjakan ({tugas.filter(t => t.status === 'in_progress').length})
+            </TabsTrigger>
+            <TabsTrigger value="completed">
+              Selesai ({tugas.filter(t => t.status === 'completed').length})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* Content */}
         {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Memuat tugas...</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredTugas.length > 0 ? (
-              filteredTugas.map((tugas) => (
-                <Card key={tugas.id} className={isOverdue(tugas.deadline) && tugas.status !== 'completed' ? 'border-red-200 bg-red-50' : ''}>
-                  <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {getFilteredTugas().length > 0 ? (
+              getFilteredTugas().map((tugasItem) => (
+                <Card key={tugasItem.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          {getStatusIcon(tugas.status)}
-                          <h3 className="font-semibold text-gray-800">{tugas.judul}</h3>
-                          {isOverdue(tugas.deadline) && tugas.status !== 'completed' && (
-                            <AlertCircle className="h-4 w-4 text-red-600" />
-                          )}
-                        </div>
-                        
-                        <div className="space-y-1 text-sm text-gray-600">
-                          <div className="flex items-center gap-1">
-                            <BookOpen className="h-4 w-4" />
-                            {tugas.mata_kuliah}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <User className="h-4 w-4" />
-                            {tugas.nama_dosen}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            {new Date(tugas.deadline).toLocaleDateString('id-ID')}
-                            {isOverdue(tugas.deadline) && tugas.status !== 'completed' && (
-                              <span className="text-red-600 font-medium">(Terlambat)</span>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {tugas.deskripsi && (
-                          <p className="mt-2 text-sm text-gray-700">{tugas.deskripsi}</p>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-2 ml-4">
+                      <CardTitle className="text-lg">{tugasItem.judul}</CardTitle>
+                      <div className="flex gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleEdit(tugas)}
+                          onClick={() => handleEdit(tugasItem)}
                         >
-                          <Edit2 className="h-4 w-4" />
+                          <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(tugas.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleDelete(tugasItem.id)}
+                          className="text-red-600 hover:text-red-800"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(tugasItem.status)}
+                      {isOverdue(tugasItem.deadline) && tugasItem.status !== 'completed' && (
+                        <Badge variant="destructive">Terlambat</Badge>
+                      )}
+                      {isDueToday(tugasItem.deadline) && tugasItem.status !== 'completed' && (
+                        <Badge className="bg-orange-100 text-orange-800">Hari Ini</Badge>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <BookOpen className="h-4 w-4" />
+                        {tugasItem.mata_kuliah}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <User className="h-4 w-4" />
+                        {tugasItem.nama_dosen}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Calendar className="h-4 w-4" />
+                        {new Date(tugasItem.deadline).toLocaleDateString('id-ID')}
+                      </div>
+                      {tugasItem.deskripsi && (
+                        <p className="text-sm text-gray-700 mt-2 line-clamp-2">
+                          {tugasItem.deskripsi}
+                        </p>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))
             ) : (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <p className="text-gray-500">
-                    {statusFilter === 'all' ? 'Belum ada tugas' : `Tidak ada tugas dengan status ${statusFilter}`}
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="col-span-full text-center py-8">
+                <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">
+                  {activeTab === 'semua' 
+                    ? 'Belum ada tugas yang ditambahkan'
+                    : `Tidak ada tugas dengan status ${activeTab === 'pending' ? 'menunggu' : 
+                        activeTab === 'in_progress' ? 'sedang dikerjakan' : 'selesai'}`
+                  }
+                </p>
+              </div>
             )}
           </div>
         )}

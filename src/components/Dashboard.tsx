@@ -10,20 +10,25 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { JadwalKuliah, Tugas } from '@/types/database';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { SmartAssistant } from '@/components/SmartAssistant';
 
 interface DashboardProps {
   onJadwalClick: () => void;
   onTugasClick: () => void;
   onProfileClick: () => void;
+  onAdminClick?: () => void;
 }
 
-export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: DashboardProps) => {
+export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick, onAdminClick }: DashboardProps) => {
   const { user, profile, signOut } = useAuth();
   const [jadwalHariIni, setJadwalHariIni] = useState<JadwalKuliah[]>([]);
   const [tugasRingkasan, setTugasRingkasan] = useState<Tugas[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
+
+  // Check if current user is admin
+  const isAdmin = user?.email === 'Adminstudizen@studizen.com';
 
   const hariOptions = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
   const hariIni = hariOptions[new Date().getDay()];
@@ -100,8 +105,15 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
     closeMobileMenu();
   };
 
+  const handleAdminClick = () => {
+    if (onAdminClick) {
+      onAdminClick();
+      closeMobileMenu();
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -112,9 +124,9 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
                 variant="ghost"
                 size="sm"
                 onClick={toggleMobileMenu}
-                className="p-2 hover:bg-white/20"
+                className="p-2 hover:bg-white/20 dark:hover:bg-gray-700/20"
               >
-                <Menu className="h-6 w-6 text-gray-700" />
+                <Menu className="h-6 w-6 text-gray-700 dark:text-gray-300" />
               </Button>
             )}
             
@@ -122,10 +134,10 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
               <GraduationCap className="h-8 w-8 text-white" />
             </div>
             <div>
-              <h1 className={`font-bold text-gray-800 ${isMobile ? 'text-2xl' : 'text-3xl'}`}>
+              <h1 className={`font-bold text-gray-800 dark:text-gray-200 ${isMobile ? 'text-2xl' : 'text-3xl'}`}>
                 Dashboard
               </h1>
-              <p className={`text-gray-600 ${isMobile ? 'text-sm' : ''}`}>
+              <p className={`text-gray-600 dark:text-gray-400 ${isMobile ? 'text-sm' : ''}`}>
                 Selamat datang, {profile?.full_name || profile?.username || user?.email}!
               </p>
             </div>
@@ -134,11 +146,22 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
           {/* Desktop Menu */}
           {!isMobile && (
             <div className="flex items-center gap-2">
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onAdminClick}
+                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Admin
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onProfileClick}
-                className="text-gray-600 hover:text-gray-800"
+                className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
               >
                 <Settings className="h-4 w-4 mr-2" />
                 Profile
@@ -147,7 +170,7 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
                 variant="ghost"
                 size="sm"
                 onClick={handleLogout}
-                className="text-gray-600 hover:text-gray-800"
+                className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
@@ -160,12 +183,12 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
         {isMobile && isMobileMenuOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50" onClick={closeMobileMenu}>
             <div 
-              className="fixed left-0 top-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out"
+              className="fixed left-0 top-0 h-full w-64 bg-white dark:bg-gray-800 shadow-lg transform transition-transform duration-300 ease-in-out"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="p-4">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-semibold text-gray-800">Menu</h2>
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Menu</h2>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -179,16 +202,27 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
                 <div className="space-y-3">
                   <Button
                     variant="ghost"
-                    className="w-full justify-start text-left p-3 hover:bg-gray-100"
+                    className="w-full justify-start text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-700"
                     onClick={closeMobileMenu}
                   >
                     <GraduationCap className="h-5 w-5 mr-3" />
                     Dashboard
                   </Button>
                   
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-700 text-red-600"
+                      onClick={handleAdminClick}
+                    >
+                      <Settings className="h-5 w-5 mr-3" />
+                      Admin Panel
+                    </Button>
+                  )}
+                  
                   <Button
                     variant="ghost"
-                    className="w-full justify-start text-left p-3 hover:bg-gray-100"
+                    className="w-full justify-start text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-700"
                     onClick={handleProfileClick}
                   >
                     <User className="h-5 w-5 mr-3" />
@@ -197,7 +231,7 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
                   
                   <Button
                     variant="ghost"
-                    className="w-full justify-start text-left p-3 hover:bg-gray-100 text-red-600"
+                    className="w-full justify-start text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-700 text-red-600"
                     onClick={handleLogoutClick}
                   >
                     <LogOut className="h-5 w-5 mr-3" />
@@ -209,32 +243,37 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
           </div>
         )}
 
+        {/* Smart Assistant */}
+        <div className="mb-8">
+          <SmartAssistant />
+        </div>
+
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={onJadwalClick}>
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer dark:bg-gray-800 dark:border-gray-700" onClick={onJadwalClick}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 dark:text-gray-200">
                 <Calendar className="h-5 w-5 text-blue-600" />
                 Jadwal Kuliah
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600">Kelola jadwal kuliah mingguan Anda</p>
+              <p className="text-gray-600 dark:text-gray-400">Kelola jadwal kuliah mingguan Anda</p>
               <Button className="mt-4 bg-blue-600 hover:bg-blue-700">
                 Buka Jadwal
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={onTugasClick}>
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer dark:bg-gray-800 dark:border-gray-700" onClick={onTugasClick}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 dark:text-gray-200">
                 <BookOpen className="h-5 w-5 text-green-600" />
                 Tugas Kuliah
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600">Pantau dan kelola tugas kuliah Anda</p>
+              <p className="text-gray-600 dark:text-gray-400">Pantau dan kelola tugas kuliah Anda</p>
               <Button className="mt-4 bg-green-600 hover:bg-green-700">
                 Buka Tugas
               </Button>
@@ -245,14 +284,14 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
         {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Memuat data...</p>
+            <p className="text-gray-600 dark:text-gray-400">Memuat data...</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Jadwal Hari Ini */}
-            <Card>
+            <Card className="dark:bg-gray-800 dark:border-gray-700">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 dark:text-gray-200">
                   <Calendar className="h-5 w-5" />
                   Jadwal Hari Ini ({hariIni})
                 </CardTitle>
@@ -261,9 +300,9 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
                 {jadwalHariIni.length > 0 ? (
                   <div className="space-y-3">
                     {jadwalHariIni.map((jadwal) => (
-                      <div key={jadwal.id} className="p-3 bg-blue-50 rounded-lg">
-                        <h4 className="font-semibold text-gray-800">{jadwal.mata_kuliah}</h4>
-                        <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
+                      <div key={jadwal.id} className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <h4 className="font-semibold text-gray-800 dark:text-gray-200">{jadwal.mata_kuliah}</h4>
+                        <div className="flex items-center gap-4 mt-1 text-sm text-gray-600 dark:text-gray-400">
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             {jadwal.jam_mulai} - {jadwal.jam_selesai}
@@ -273,7 +312,7 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
                           )}
                         </div>
                         {jadwal.dosen && (
-                          <div className="flex items-center gap-1 mt-1 text-sm text-gray-600">
+                          <div className="flex items-center gap-1 mt-1 text-sm text-gray-600 dark:text-gray-400">
                             <User className="h-3 w-3" />
                             {jadwal.dosen}
                           </div>
@@ -282,7 +321,7 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-center py-4">
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-4">
                     Tidak ada jadwal kuliah hari ini
                   </p>
                 )}
@@ -290,9 +329,9 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
             </Card>
 
             {/* Tugas Mendatang */}
-            <Card>
+            <Card className="dark:bg-gray-800 dark:border-gray-700">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 dark:text-gray-200">
                   <BookOpen className="h-5 w-5" />
                   Tugas Mendatang
                 </CardTitle>
@@ -301,11 +340,11 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
                 {tugasRingkasan.length > 0 ? (
                   <div className="space-y-3">
                     {tugasRingkasan.map((tugas) => (
-                      <div key={tugas.id} className="p-3 bg-gray-50 rounded-lg">
+                      <div key={tugas.id} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <h4 className="font-semibold text-gray-800">{tugas.judul}</h4>
-                            <p className="text-sm text-gray-600">{tugas.mata_kuliah}</p>
+                            <h4 className="font-semibold text-gray-800 dark:text-gray-200">{tugas.judul}</h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">{tugas.mata_kuliah}</p>
                             <div className="flex items-center gap-2 mt-1">
                               <Clock className="h-3 w-3 text-gray-500" />
                               <span className="text-xs text-gray-500">
@@ -327,7 +366,7 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-center py-4">
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-4">
                     Tidak ada tugas yang perlu dikerjakan
                   </p>
                 )}
