@@ -4,11 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   Calendar, BookOpen, CheckCircle, Clock, 
-  User, Settings, LogOut, GraduationCap
+  User, Settings, LogOut, GraduationCap, Menu, X
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { JadwalKuliah, Tugas } from '@/types/database';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface DashboardProps {
   onJadwalClick: () => void;
@@ -21,6 +22,8 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
   const [jadwalHariIni, setJadwalHariIni] = useState<JadwalKuliah[]>([]);
   const [tugasRingkasan, setTugasRingkasan] = useState<Tugas[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const hariOptions = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
   const hariIni = hariOptions[new Date().getDay()];
@@ -79,44 +82,132 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick }: Dashb
     }
   };
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleProfileClick = () => {
+    onProfileClick();
+    closeMobileMenu();
+  };
+
+  const handleLogoutClick = () => {
+    handleLogout();
+    closeMobileMenu();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
+            {/* Mobile Hamburger Menu */}
+            {isMobile && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleMobileMenu}
+                className="p-2 hover:bg-white/20"
+              >
+                <Menu className="h-6 w-6 text-gray-700" />
+              </Button>
+            )}
+            
             <div className="bg-blue-600 p-3 rounded-full">
               <GraduationCap className="h-8 w-8 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-              <p className="text-gray-600">
+              <h1 className={`font-bold text-gray-800 ${isMobile ? 'text-2xl' : 'text-3xl'}`}>
+                Dashboard
+              </h1>
+              <p className={`text-gray-600 ${isMobile ? 'text-sm' : ''}`}>
                 Selamat datang, {profile?.full_name || profile?.username || user?.email}!
               </p>
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onProfileClick}
-              className="text-gray-600 hover:text-gray-800"
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Profile
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="text-gray-600 hover:text-gray-800"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
+          {/* Desktop Menu */}
+          {!isMobile && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onProfileClick}
+                className="text-gray-600 hover:text-gray-800"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Profile
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="text-gray-600 hover:text-gray-800"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
+          )}
         </div>
+
+        {/* Mobile Slide Menu Overlay */}
+        {isMobile && isMobileMenuOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50" onClick={closeMobileMenu}>
+            <div 
+              className="fixed left-0 top-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-semibold text-gray-800">Menu</h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={closeMobileMenu}
+                    className="p-1"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+                
+                <div className="space-y-3">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-left p-3 hover:bg-gray-100"
+                    onClick={closeMobileMenu}
+                  >
+                    <GraduationCap className="h-5 w-5 mr-3" />
+                    Dashboard
+                  </Button>
+                  
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-left p-3 hover:bg-gray-100"
+                    onClick={handleProfileClick}
+                  >
+                    <User className="h-5 w-5 mr-3" />
+                    Profile
+                  </Button>
+                  
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-left p-3 hover:bg-gray-100 text-red-600"
+                    onClick={handleLogoutClick}
+                  >
+                    <LogOut className="h-5 w-5 mr-3" />
+                    Logout
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
