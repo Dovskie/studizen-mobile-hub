@@ -7,23 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  ArrowLeft, User, Mail, Save, LogOut, 
-  Eye, EyeOff, Lock, Trash2, Moon, Sun, Monitor
-} from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeft, User, Mail, Lock, Palette, Trash2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 const profileSchema = z.object({
-  username: z.string().min(3, 'Username minimal 3 karakter'),
   full_name: z.string().min(1, 'Nama lengkap wajib diisi'),
+  username: z.string().min(3, 'Username minimal 3 karakter'),
 });
 
 const passwordSchema = z.object({
-  currentPassword: z.string().min(1, 'Password saat ini wajib diisi'),
+  currentPassword: z.string().min(1, 'Password lama wajib diisi'),
   newPassword: z.string().min(6, 'Password baru minimal 6 karakter'),
   confirmPassword: z.string(),
 }).refine((data) => data.newPassword === data.confirmPassword, {
@@ -36,68 +33,63 @@ const emailSchema = z.object({
   password: z.string().min(1, 'Password wajib diisi untuk mengubah email'),
 });
 
-const deleteAccountSchema = z.object({
-  confirmText: z.string().refine((val) => val === 'DELETE', {
-    message: 'Ketik "DELETE" untuk konfirmasi',
-  }),
-  password: z.string().min(1, 'Password wajib diisi'),
-});
-
 type ProfileForm = z.infer<typeof profileSchema>;
 type PasswordForm = z.infer<typeof passwordSchema>;
 type EmailForm = z.infer<typeof emailSchema>;
-type DeleteAccountForm = z.infer<typeof deleteAccountSchema>;
 
 interface ProfilePageProps {
   onBackClick: () => void;
 }
 
 export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
-  const { user, profile, signOut, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [passwordLoading, setPasswordLoading] = useState(false);
-  const [emailLoading, setEmailLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showEmailPassword, setShowEmailPassword] = useState(false);
-  const [showDeletePassword, setShowDeletePassword] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
 
   const profileForm = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      username: profile?.username || '',
       full_name: profile?.full_name || '',
+      username: profile?.username || '',
     },
   });
 
   const passwordForm = useForm<PasswordForm>({
     resolver: zodResolver(passwordSchema),
+    defaultValues: {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    },
   });
 
   const emailForm = useForm<EmailForm>({
     resolver: zodResolver(emailSchema),
+    defaultValues: {
+      newEmail: '',
+      password: '',
+    },
   });
-
-  const deleteForm = useForm<DeleteAccountForm>({
-    resolver: zodResolver(deleteAccountSchema),
-  });
-
-  useEffect(() => {
-    if (profile) {
-      profileForm.setValue('username', profile.username || '');
-      profileForm.setValue('full_name', profile.full_name || '');
-    }
-  }, [profile, profileForm]);
 
   useEffect(() => {
     // Load theme preference
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' || 'system';
     setTheme(savedTheme);
-    applyTheme(savedTheme);
   }, []);
+
+  useEffect(() => {
+    // Update form values when profile changes
+    if (profile) {
+      profileForm.reset({
+        full_name: profile.full_name || '',
+        username: profile.username || '',
+      });
+    }
+  }, [profile, profileForm]);
 
   const applyTheme = (selectedTheme: 'light' | 'dark' | 'system') => {
     const root = window.document.documentElement;
@@ -108,16 +100,16 @@ export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
     } else {
       root.classList.toggle('dark', selectedTheme === 'dark');
     }
+    
+    localStorage.setItem('theme', selectedTheme);
   };
 
   const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
     setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
     applyTheme(newTheme);
-    
     toast({
       title: "Tema Berhasil Diubah",
-      description: `Tema ${newTheme === 'light' ? 'Terang' : newTheme === 'dark' ? 'Gelap' : 'Sistem'} telah diterapkan`,
+      description: `Tema telah diubah ke ${newTheme === 'light' ? 'terang' : newTheme === 'dark' ? 'gelap' : 'sistem'}`,
     });
   };
 
@@ -129,26 +121,26 @@ export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
       const { error } = await supabase
         .from('profiles')
         .update({
-          username: data.username,
           full_name: data.full_name,
+          username: data.username,
           updated_at: new Date().toISOString(),
         })
         .eq('id', user.id);
 
       if (error) throw error;
 
+      await refreshProfile();
+      
       toast({
-        title: "Berhasil",
-        description: "Profile berhasil diperbarui",
+        title: "Profil Berhasil Diperbarui",
+        description: "Informasi profil Anda telah disimpan",
       });
-
-      refreshProfile();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating profile:', error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Gagal memperbarui profile",
+        title: "Gagal Memperbarui Profil",
+        description: error.message || "Terjadi kesalahan saat memperbarui profil",
       });
     } finally {
       setLoading(false);
@@ -156,199 +148,193 @@ export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
   };
 
   const onPasswordSubmit = async (data: PasswordForm) => {
-    if (!user?.email) return;
-    
-    setPasswordLoading(true);
+    setLoading(true);
     try {
       // Verify current password by attempting to sign in
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: data.currentPassword,
-      });
-
-      if (signInError) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Password saat ini salah",
+      if (user?.email) {
+        const { error: verifyError } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: data.currentPassword,
         });
-        return;
+
+        if (verifyError) {
+          toast({
+            variant: "destructive",
+            title: "Password Lama Salah",
+            description: "Password lama yang Anda masukkan tidak benar",
+          });
+          return;
+        }
       }
 
       // Update password
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         password: data.newPassword,
       });
 
-      if (updateError) throw updateError;
-
-      toast({
-        title: "Berhasil",
-        description: "Password berhasil diubah",
-      });
+      if (error) throw error;
 
       passwordForm.reset();
-    } catch (error) {
+      
+      toast({
+        title: "Password Berhasil Diubah",
+        description: "Password Anda telah diperbarui",
+      });
+    } catch (error: any) {
       console.error('Error updating password:', error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Gagal mengubah password",
+        title: "Gagal Mengubah Password",
+        description: error.message || "Terjadi kesalahan saat mengubah password",
       });
     } finally {
-      setPasswordLoading(false);
+      setLoading(false);
     }
   };
 
   const onEmailSubmit = async (data: EmailForm) => {
-    if (!user?.email) return;
+    if (!user) return;
     
-    setEmailLoading(true);
+    setLoading(true);
     try {
       // Verify password first
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user.email!,
         password: data.password,
       });
 
-      if (signInError) {
+      if (verifyError) {
         toast({
           variant: "destructive",
-          title: "Error",
-          description: "Password salah",
+          title: "Password Salah",
+          description: "Password yang Anda masukkan tidak benar",
         });
         return;
       }
 
       // Update email
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         email: data.newEmail,
       });
 
-      if (updateError) throw updateError;
+      if (error) throw error;
 
-      toast({
-        title: "Email Diperbarui",
-        description: "Silakan cek email baru Anda untuk konfirmasi. Anda akan logout otomatis.",
-      });
-
-      // Logout user after email change
-      setTimeout(async () => {
-        await signOut();
-      }, 2000);
+      // Update profile table
+      await supabase
+        .from('profiles')
+        .update({
+          email: data.newEmail,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
 
       emailForm.reset();
-    } catch (error) {
+      
+      toast({
+        title: "Email Berhasil Diubah",
+        description: "Email Anda telah diperbarui. Silakan periksa email baru untuk konfirmasi.",
+      });
+
+      // Sign out user to re-authenticate with new email
+      setTimeout(() => {
+        signOut();
+      }, 2000);
+    } catch (error: any) {
       console.error('Error updating email:', error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Gagal mengubah email",
+        title: "Gagal Mengubah Email",
+        description: error.message || "Terjadi kesalahan saat mengubah email",
       });
     } finally {
-      setEmailLoading(false);
+      setLoading(false);
     }
   };
 
-  const onDeleteAccountSubmit = async (data: DeleteAccountForm) => {
-    if (!user?.email) return;
+  const handleDeleteAccount = async () => {
+    if (!user) return;
     
-    setDeleteLoading(true);
-    try {
-      // Verify password
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: data.password,
+    const confirmation = prompt(
+      'Untuk menghapus akun, ketik "HAPUS AKUN" (tanpa tanda petik):'
+    );
+    
+    if (confirmation !== 'HAPUS AKUN') {
+      toast({
+        variant: "destructive",
+        title: "Konfirmasi Gagal",
+        description: "Konfirmasi tidak sesuai. Penghapusan akun dibatalkan.",
       });
+      return;
+    }
 
-      if (signInError) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Password salah",
-        });
-        return;
-      }
-
-      // Delete user profile first
-      const { error: profileError } = await supabase
+    setLoading(true);
+    try {
+      // Delete profile data
+      await supabase
         .from('profiles')
         .delete()
         .eq('id', user.id);
 
-      if (profileError) {
-        console.error('Error deleting profile:', profileError);
-      }
+      // Delete user data from other tables
+      await supabase
+        .from('jadwal_kuliah')
+        .delete()
+        .eq('user_id', user.id);
 
-      // Delete user account (this might not work due to RLS, but we'll try)
-      const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id);
+      await supabase
+        .from('tugas')
+        .delete()
+        .eq('user_id', user.id);
 
-      if (deleteError) {
-        console.error('Error deleting user:', deleteError);
-        // If admin delete fails, just sign out
-        await signOut();
-      }
+      await supabase
+        .from('otp_verifications')
+        .delete()
+        .eq('user_id', user.id);
 
       toast({
-        title: "Akun Dihapus",
-        description: "Akun Anda telah dihapus. Terima kasih telah menggunakan layanan kami.",
+        title: "Akun Berhasil Dihapus",
+        description: "Akun dan semua data Anda telah dihapus permanen",
       });
 
-      // Sign out
+      // Sign out user
       await signOut();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting account:', error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Gagal menghapus akun",
+        title: "Gagal Menghapus Akun",
+        description: error.message || "Terjadi kesalahan saat menghapus akun",
       });
     } finally {
-      setDeleteLoading(false);
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      toast({
-        title: "Berhasil",
-        description: "Anda telah logout",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Gagal logout",
-      });
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <Button variant="ghost" size="sm" onClick={onBackClick}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-2xl font-bold text-gray-800">Profile & Pengaturan</h1>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Profil & Pengaturan</h1>
+            <p className="text-gray-600 dark:text-gray-400">Kelola informasi akun dan preferensi Anda</p>
+          </div>
         </div>
 
-        <Tabs defaultValue="account" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="account">Akun</TabsTrigger>
-            <TabsTrigger value="password">Password</TabsTrigger>
-            <TabsTrigger value="email">Email</TabsTrigger>
-            <TabsTrigger value="theme">Tema</TabsTrigger>
-            <TabsTrigger value="danger">Bahaya</TabsTrigger>
+        <Tabs defaultValue="profile" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="profile">Informasi Akun</TabsTrigger>
+            <TabsTrigger value="password">Ubah Password</TabsTrigger>
+            <TabsTrigger value="email">Ubah Email</TabsTrigger>
+            <TabsTrigger value="settings">Pengaturan</TabsTrigger>
           </TabsList>
 
-          {/* Account Information Tab */}
-          <TabsContent value="account">
-            <Card>
+          <TabsContent value="profile">
+            <Card className="dark:bg-gray-800 dark:border-gray-700">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 dark:text-gray-200">
                   <User className="h-5 w-5" />
                   Informasi Akun
                 </CardTitle>
@@ -356,25 +342,26 @@ export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
               <CardContent>
                 <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="email"
-                        type="email"
-                        value={user?.email || ''}
-                        disabled
-                        className="pl-10 bg-gray-50"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500">Email dapat diubah di tab Email</p>
+                    <Label htmlFor="full_name" className="dark:text-gray-300">Nama Lengkap</Label>
+                    <Input
+                      id="full_name"
+                      placeholder="Masukkan nama lengkap"
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                      {...profileForm.register('full_name')}
+                    />
+                    {profileForm.formState.errors.full_name && (
+                      <p className="text-sm text-red-600">
+                        {profileForm.formState.errors.full_name.message}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
+                    <Label htmlFor="username" className="dark:text-gray-300">Username</Label>
                     <Input
                       id="username"
-                      placeholder="masukkan username"
+                      placeholder="Masukkan username"
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                       {...profileForm.register('username')}
                     />
                     {profileForm.formState.errors.username && (
@@ -385,17 +372,15 @@ export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="full_name">Nama Lengkap</Label>
+                    <Label className="dark:text-gray-300">Email</Label>
                     <Input
-                      id="full_name"
-                      placeholder="masukkan nama lengkap"
-                      {...profileForm.register('full_name')}
+                      value={user?.email || ''}
+                      disabled
+                      className="bg-gray-100 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-300"
                     />
-                    {profileForm.formState.errors.full_name && (
-                      <p className="text-sm text-red-600">
-                        {profileForm.formState.errors.full_name.message}
-                      </p>
-                    )}
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Email tidak dapat diubah di sini. Gunakan tab "Ubah Email" untuk mengubah email.
+                    </p>
                   </div>
 
                   <Button
@@ -403,19 +388,17 @@ export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
                     disabled={loading}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    {loading ? 'Menyimpan...' : 'Simpan Profile'}
+                    {loading ? 'Menyimpan...' : 'Simpan Perubahan'}
                   </Button>
                 </form>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Password Tab */}
           <TabsContent value="password">
-            <Card>
+            <Card className="dark:bg-gray-800 dark:border-gray-700">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 dark:text-gray-200">
                   <Lock className="h-5 w-5" />
                   Ubah Password
                 </CardTitle>
@@ -423,14 +406,13 @@ export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
               <CardContent>
                 <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="currentPassword">Password Saat Ini</Label>
+                    <Label htmlFor="currentPassword" className="dark:text-gray-300">Password Lama</Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="currentPassword"
                         type={showCurrentPassword ? 'text' : 'password'}
-                        placeholder="masukkan password saat ini"
-                        className="pl-10 pr-10"
+                        placeholder="Masukkan password lama"
+                        className="pr-10 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                         {...passwordForm.register('currentPassword')}
                       />
                       <Button
@@ -451,14 +433,13 @@ export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="newPassword">Password Baru</Label>
+                    <Label htmlFor="newPassword" className="dark:text-gray-300">Password Baru</Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="newPassword"
                         type={showNewPassword ? 'text' : 'password'}
-                        placeholder="masukkan password baru"
-                        className="pl-10 pr-10"
+                        placeholder="Masukkan password baru"
+                        className="pr-10 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                         {...passwordForm.register('newPassword')}
                       />
                       <Button
@@ -479,14 +460,13 @@ export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Konfirmasi Password Baru</Label>
+                    <Label htmlFor="confirmPassword" className="dark:text-gray-300">Konfirmasi Password Baru</Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="confirmPassword"
                         type={showConfirmPassword ? 'text' : 'password'}
-                        placeholder="konfirmasi password baru"
-                        className="pl-10 pr-10"
+                        placeholder="Konfirmasi password baru"
+                        className="pr-10 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                         {...passwordForm.register('confirmPassword')}
                       />
                       <Button
@@ -508,22 +488,20 @@ export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
 
                   <Button
                     type="submit"
-                    disabled={passwordLoading}
+                    disabled={loading}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    {passwordLoading ? 'Mengubah...' : 'Ubah Password'}
+                    {loading ? 'Mengubah...' : 'Ubah Password'}
                   </Button>
                 </form>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Email Tab */}
           <TabsContent value="email">
-            <Card>
+            <Card className="dark:bg-gray-800 dark:border-gray-700">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 dark:text-gray-200">
                   <Mail className="h-5 w-5" />
                   Ubah Email
                 </CardTitle>
@@ -531,22 +509,21 @@ export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
               <CardContent>
                 <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="currentEmail">Email Saat Ini</Label>
+                    <Label className="dark:text-gray-300">Email Saat Ini</Label>
                     <Input
-                      id="currentEmail"
-                      type="email"
                       value={user?.email || ''}
                       disabled
-                      className="bg-gray-50"
+                      className="bg-gray-100 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-300"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="newEmail">Email Baru</Label>
+                    <Label htmlFor="newEmail" className="dark:text-gray-300">Email Baru</Label>
                     <Input
                       id="newEmail"
                       type="email"
-                      placeholder="masukkan email baru"
+                      placeholder="Masukkan email baru"
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                       {...emailForm.register('newEmail')}
                     />
                     {emailForm.formState.errors.newEmail && (
@@ -557,14 +534,13 @@ export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="emailPassword">Konfirmasi Password</Label>
+                    <Label htmlFor="password" className="dark:text-gray-300">Password untuk Konfirmasi</Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
-                        id="emailPassword"
+                        id="password"
                         type={showEmailPassword ? 'text' : 'password'}
-                        placeholder="masukkan password untuk konfirmasi"
-                        className="pl-10 pr-10"
+                        placeholder="Masukkan password"
+                        className="pr-10 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                         {...emailForm.register('password')}
                       />
                       <Button
@@ -584,164 +560,80 @@ export const ProfilePage = ({ onBackClick }: ProfilePageProps) => {
                     )}
                   </div>
 
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <p className="text-sm text-yellow-800">
-                      <strong>Perhatian:</strong> Setelah mengubah email, Anda akan menerima email konfirmasi 
-                      di alamat email baru. Anda akan logout otomatis dan perlu login kembali setelah konfirmasi.
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      <strong>Peringatan:</strong> Setelah mengubah email, Anda akan diminta untuk login ulang dengan email baru.
                     </p>
                   </div>
 
                   <Button
                     type="submit"
-                    disabled={emailLoading}
+                    disabled={loading}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    {emailLoading ? 'Mengubah...' : 'Ubah Email'}
+                    {loading ? 'Mengubah...' : 'Ubah Email'}
                   </Button>
                 </form>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Theme Tab */}
-          <TabsContent value="theme">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Monitor className="h-5 w-5" />
-                  Preferensi Tema
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button
-                    variant={theme === 'light' ? 'default' : 'outline'}
-                    className="h-20 flex flex-col gap-2"
-                    onClick={() => handleThemeChange('light')}
-                  >
-                    <Sun className="h-6 w-6" />
-                    <span>Terang</span>
-                  </Button>
-                  
-                  <Button
-                    variant={theme === 'dark' ? 'default' : 'outline'}
-                    className="h-20 flex flex-col gap-2"
-                    onClick={() => handleThemeChange('dark')}
-                  >
-                    <Moon className="h-6 w-6" />
-                    <span>Gelap</span>
-                  </Button>
-                  
-                  <Button
-                    variant={theme === 'system' ? 'default' : 'outline'}
-                    className="h-20 flex flex-col gap-2"
-                    onClick={() => handleThemeChange('system')}
-                  >
-                    <Monitor className="h-6 w-6" />
-                    <span>Sistem</span>
-                  </Button>
-                </div>
-                
-                <p className="text-sm text-gray-600">
-                  Pilih tema yang Anda sukai. Tema sistem akan mengikuti pengaturan perangkat Anda.
-                </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Danger Zone Tab */}
-          <TabsContent value="danger">
-            <Card className="border-red-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-red-600">
-                  <Trash2 className="h-5 w-5" />
-                  Zona Bahaya
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Logout Section */}
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-gray-800 mb-2">Logout</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Keluar dari akun Anda dan kembali ke halaman login.
-                  </p>
-                  <Button
-                    onClick={handleSignOut}
-                    variant="outline"
-                    className="border-gray-300 hover:bg-gray-50"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </Button>
-                </div>
-
-                <Separator />
-
-                {/* Delete Account Section */}
-                <div className="border border-red-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-red-600 mb-2">Hapus Akun</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Tindakan ini akan menghapus akun Anda secara permanen beserta semua data yang terkait. 
-                    Tindakan ini tidak dapat dibatalkan.
-                  </p>
-                  
-                  <form onSubmit={deleteForm.handleSubmit(onDeleteAccountSubmit)} className="space-y-4">
+          <TabsContent value="settings">
+            <div className="space-y-6">
+              <Card className="dark:bg-gray-800 dark:border-gray-700">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 dark:text-gray-200">
+                    <Palette className="h-5 w-5" />
+                    Preferensi Tema
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="confirmText">Ketik "DELETE" untuk konfirmasi</Label>
-                      <Input
-                        id="confirmText"
-                        placeholder="DELETE"
-                        {...deleteForm.register('confirmText')}
-                      />
-                      {deleteForm.formState.errors.confirmText && (
-                        <p className="text-sm text-red-600">
-                          {deleteForm.formState.errors.confirmText.message}
-                        </p>
-                      )}
+                      <Label className="dark:text-gray-300">Pilih Tema</Label>
+                      <Select value={theme} onValueChange={handleThemeChange}>
+                        <SelectTrigger className="dark:bg-gray-700 dark:border-gray-600">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="light">Terang</SelectItem>
+                          <SelectItem value="dark">Gelap</SelectItem>
+                          <SelectItem value="system">Ikuti Sistem</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="deletePassword">Konfirmasi Password</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          id="deletePassword"
-                          type={showDeletePassword ? 'text' : 'password'}
-                          placeholder="masukkan password Anda"
-                          className="pl-10 pr-10"
-                          {...deleteForm.register('password')}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3"
-                          onClick={() => setShowDeletePassword(!showDeletePassword)}
-                        >
-                          {showDeletePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                      {deleteForm.formState.errors.password && (
-                        <p className="text-sm text-red-600">
-                          {deleteForm.formState.errors.password.message}
-                        </p>
-                      )}
+              <Card className="border-red-200 dark:border-red-800 dark:bg-gray-800">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                    <Trash2 className="h-5 w-5" />
+                    Zona Bahaya
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                      <h3 className="font-semibold text-red-800 dark:text-red-300 mb-2">Hapus Akun</h3>
+                      <p className="text-sm text-red-700 dark:text-red-400 mb-4">
+                        Tindakan ini akan menghapus akun Anda secara permanen beserta semua data yang terkait. 
+                        Tindakan ini tidak dapat dibatalkan.
+                      </p>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDeleteAccount}
+                        disabled={loading}
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        {loading ? 'Menghapus...' : 'Hapus Akun'}
+                      </Button>
                     </div>
-
-                    <Button
-                      type="submit"
-                      disabled={deleteLoading}
-                      variant="destructive"
-                      className="w-full"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      {deleteLoading ? 'Menghapus...' : 'Hapus Akun Permanen'}
-                    </Button>
-                  </form>
-                </div>
-              </CardContent>
-            </Card>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

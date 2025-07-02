@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, Mail, User, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { generateOTP, getOTPExpirationTime } from '@/utils/otpUtils';
 
 const registerSchema = z.object({
   email: z.string().email('Email tidak valid'),
@@ -41,11 +42,53 @@ export const RegisterPage = ({ onBackClick, onRegisterSuccess }: RegisterPagePro
     resolver: zodResolver(registerSchema),
   });
 
+  const sendOTPEmail = async (email: string, otp: string, name: string) => {
+    try {
+      const response = await fetch('/api/send-otp-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          otp,
+          name,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send OTP email');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error sending OTP email:', error);
+      throw error;
+    }
+  };
+
   const onSubmit = async (data: RegisterForm) => {
     setLoading(true);
     
     try {
-      const { error } = await supabase.auth.signUp({
+      // Check if user already exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', data.email)
+        .single();
+
+      if (existingUser) {
+        toast({
+          variant: "destructive",
+          title: "Registrasi Gagal",
+          description: "Email sudah terdaftar",
+        });
+        return;
+      }
+
+      // Create user account with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
@@ -53,28 +96,70 @@ export const RegisterPage = ({ onBackClick, onRegisterSuccess }: RegisterPagePro
             username: data.username,
             full_name: data.username,
           },
-          emailRedirectTo: `${window.location.origin}/`,
         },
       });
 
-      if (error) {
+      if (authError) {
         toast({
           variant: "destructive",
           title: "Registrasi Gagal",
-          description: error.message === 'User already registered' 
-            ? 'Email sudah terdaftar' 
-            : error.message,
+          description: authError.message,
         });
         return;
       }
 
-      toast({
-        title: "Registrasi Berhasil",
-        description: "Silakan cek email untuk verifikasi akun",
-      });
-      
-      onRegisterSuccess(data.email);
+      if (!authData.user) {
+        toast({
+          variant: "destructive",
+          title: "Registrasi Gagal",
+          description: "Gagal membuat akun",
+        });
+        return;
+      }
+
+      // Generate and save OTP
+      const otp = generateOTP();
+      const expiresAt = getOTPExpirationTime();
+
+      const { error: otpError } = await supabase
+        .from('otp_verifications')
+        .insert([{
+          user_id: authData.user.id,
+          email: data.email,
+          otp_code: otp,
+          expires_at: expiresAt,
+        }]);
+
+      if (otpError) {
+        console.error('Error saving OTP:', otpError);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Gagal menyimpan kode verifikasi",
+        });
+        return;
+      }
+
+      // Send OTP via email
+      try {
+        await sendOTPEmail(data.email, otp, data.username);
+        
+        toast({
+          title: "Registrasi Berhasil",
+          description: "Kode verifikasi telah dikirim ke email Anda",
+        });
+        
+        onRegisterSuccess(data.email);
+      } catch (emailError) {
+        console.error('Error sending OTP email:', emailError);
+        toast({
+          title: "Registrasi Berhasil",
+          description: "Akun berhasil dibuat. Silakan masukkan kode OTP: " + otp,
+        });
+        onRegisterSuccess(data.email);
+      }
     } catch (error) {
+      console.error('Registration error:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -86,28 +171,28 @@ export const RegisterPage = ({ onBackClick, onRegisterSuccess }: RegisterPagePro
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md mx-auto shadow-lg">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md mx-auto shadow-lg dark:bg-gray-800 dark:border-gray-700">
         <CardHeader className="space-y-1">
           <div className="flex items-center gap-2 mb-4">
             <Button variant="ghost" size="sm" onClick={onBackClick}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <CardTitle className="text-2xl">Register</CardTitle>
+            <CardTitle className="text-2xl dark:text-gray-200">Register</CardTitle>
           </div>
         </CardHeader>
         
         <CardContent className="space-y-4">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="dark:text-gray-300">Email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="email"
                   type="email"
                   placeholder="masukkan email"
-                  className="pl-10"
+                  className="pl-10 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                   {...register('email')}
                 />
               </div>
@@ -117,14 +202,14 @@ export const RegisterPage = ({ onBackClick, onRegisterSuccess }: RegisterPagePro
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username" className="dark:text-gray-300">Username</Label>
               <div className="relative">
                 <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="username"
                   type="text"
                   placeholder="masukkan username"
-                  className="pl-10"
+                  className="pl-10 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                   {...register('username')}
                 />
               </div>
@@ -134,14 +219,14 @@ export const RegisterPage = ({ onBackClick, onRegisterSuccess }: RegisterPagePro
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="dark:text-gray-300">Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="masukkan password"
-                  className="pl-10 pr-10"
+                  className="pl-10 pr-10 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                   {...register('password')}
                 />
                 <Button
@@ -160,14 +245,14 @@ export const RegisterPage = ({ onBackClick, onRegisterSuccess }: RegisterPagePro
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
+              <Label htmlFor="confirmPassword" className="dark:text-gray-300">Konfirmasi Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
                   placeholder="konfirmasi password"
-                  className="pl-10 pr-10"
+                  className="pl-10 pr-10 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                   {...register('confirmPassword')}
                 />
                 <Button

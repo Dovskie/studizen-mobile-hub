@@ -1,15 +1,14 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, LogIn, UserPlus, Shield } from 'lucide-react';
+import { GraduationCap, LogIn, UserPlus } from 'lucide-react';
 
 interface WelcomePageProps {
   onLoginClick: () => void;
   onRegisterClick: () => void;
-  onAdminClick: () => void;
 }
 
-export const WelcomePage = ({ onLoginClick, onRegisterClick, onAdminClick }: WelcomePageProps) => {
+export const WelcomePage = ({ onLoginClick, onRegisterClick }: WelcomePageProps) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -45,25 +44,6 @@ export const WelcomePage = ({ onLoginClick, onRegisterClick, onAdminClick }: Wel
             >
               <UserPlus className="mr-2 h-5 w-5" />
               Daftar Akun Baru
-            </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-gray-300 dark:border-gray-600" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white dark:bg-gray-800 px-2 text-gray-500">atau</span>
-              </div>
-            </div>
-
-            <Button
-              onClick={onAdminClick}
-              variant="outline"
-              className="w-full py-3 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-              size="lg"
-            >
-              <Shield className="mr-2 h-5 w-5" />
-              Login Admin
             </Button>
 
             <div className="text-center pt-4">

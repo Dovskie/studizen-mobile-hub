@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -103,7 +102,12 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
         const { error } = await supabase
           .from('tugas')
           .update({
-            ...data,
+            judul: data.judul,
+            deskripsi: data.deskripsi,
+            mata_kuliah: data.mata_kuliah,
+            nama_dosen: data.nama_dosen,
+            deadline: data.deadline,
+            status: data.status,
             updated_at: new Date().toISOString(),
           })
           .eq('id', selectedTugas.id);
@@ -119,7 +123,12 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
         const { error } = await supabase
           .from('tugas')
           .insert([{
-            ...data,
+            judul: data.judul,
+            deskripsi: data.deskripsi,
+            mata_kuliah: data.mata_kuliah,
+            nama_dosen: data.nama_dosen,
+            deadline: data.deadline,
+            status: data.status,
             user_id: user.id,
           }]);
 
@@ -201,13 +210,13 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge className="bg-green-100 text-green-800">Selesai</Badge>;
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Selesai</Badge>;
       case 'in_progress':
-        return <Badge className="bg-blue-100 text-blue-800">Sedang Dikerjakan</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Sedang Dikerjakan</Badge>;
       case 'pending':
-        return <Badge className="bg-yellow-100 text-yellow-800">Menunggu</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Menunggu</Badge>;
       default:
-        return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>;
+        return <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">Unknown</Badge>;
     }
   };
 
@@ -225,7 +234,7 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -234,8 +243,8 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold text-gray-800">Tugas Kuliah</h1>
-              <p className="text-gray-600">Kelola tugas kuliah Anda</p>
+              <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Tugas Kuliah</h1>
+              <p className="text-gray-600 dark:text-gray-400">Kelola tugas kuliah Anda</p>
             </div>
           </div>
           
@@ -375,16 +384,16 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
         {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Memuat tugas...</p>
+            <p className="text-gray-600 dark:text-gray-400">Memuat tugas...</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {getFilteredTugas().length > 0 ? (
               getFilteredTugas().map((tugasItem) => (
-                <Card key={tugasItem.id} className="hover:shadow-lg transition-shadow">
+                <Card key={tugasItem.id} className="hover:shadow-lg transition-shadow dark:bg-gray-800 dark:border-gray-700">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
-                      <CardTitle className="text-lg">{tugasItem.judul}</CardTitle>
+                      <CardTitle className="text-lg dark:text-gray-200">{tugasItem.judul}</CardTitle>
                       <div className="flex gap-1">
                         <Button
                           variant="ghost"
@@ -397,7 +406,7 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDelete(tugasItem.id)}
-                          className="text-red-600 hover:text-red-800"
+                          className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -409,26 +418,26 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
                         <Badge variant="destructive">Terlambat</Badge>
                       )}
                       {isDueToday(tugasItem.deadline) && tugasItem.status !== 'completed' && (
-                        <Badge className="bg-orange-100 text-orange-800">Hari Ini</Badge>
+                        <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Hari Ini</Badge>
                       )}
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                         <BookOpen className="h-4 w-4" />
                         {tugasItem.mata_kuliah}
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                         <User className="h-4 w-4" />
                         {tugasItem.nama_dosen}
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                         <Calendar className="h-4 w-4" />
                         {new Date(tugasItem.deadline).toLocaleDateString('id-ID')}
                       </div>
                       {tugasItem.deskripsi && (
-                        <p className="text-sm text-gray-700 mt-2 line-clamp-2">
+                        <p className="text-sm text-gray-700 dark:text-gray-300 mt-2 line-clamp-2">
                           {tugasItem.deskripsi}
                         </p>
                       )}
@@ -439,7 +448,7 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
             ) : (
               <div className="col-span-full text-center py-8">
                 <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">
+                <p className="text-gray-500 dark:text-gray-400">
                   {activeTab === 'semua' 
                     ? 'Belum ada tugas yang ditambahkan'
                     : `Tidak ada tugas dengan status ${activeTab === 'pending' ? 'menunggu' : 

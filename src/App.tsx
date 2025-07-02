@@ -16,20 +16,17 @@ import { Dashboard } from '@/components/Dashboard';
 import { JadwalKuliah } from '@/components/JadwalKuliah';
 import { TugasKuliah } from '@/components/TugasKuliah';
 import { ProfilePage } from '@/components/ProfilePage';
-import { AdminLoginPage } from '@/components/AdminLoginPage';
 import { AdminPanel } from '@/components/AdminPanel';
 
 const queryClient = new QueryClient();
 
-type Page = 'welcome' | 'login' | 'register' | 'verification' | 'forgot-password' | 'reset-password' | 'dashboard' | 'jadwal' | 'tugas' | 'profile' | 'admin-login' | 'admin-panel';
+type Page = 'welcome' | 'login' | 'register' | 'verification' | 'forgot-password' | 'reset-password' | 'dashboard' | 'jadwal' | 'tugas' | 'profile' | 'admin-panel';
 
 const AppContent = () => {
   const { user, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('welcome');
   const [verificationEmail, setVerificationEmail] = useState('');
-
-  // Check if current user is admin
-  const isAdmin = user?.email === 'Adminstudizen@studizen.com';
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!loading) {
@@ -43,13 +40,17 @@ const AppContent = () => {
         return;
       }
 
-      if (user) {
-        setCurrentPage('dashboard');
+      if (user || isAdmin) {
+        if (isAdmin) {
+          setCurrentPage('admin-panel');
+        } else {
+          setCurrentPage('dashboard');
+        }
       } else {
         setCurrentPage('welcome');
       }
     }
-  }, [user, loading]);
+  }, [user, loading, isAdmin]);
 
   useEffect(() => {
     // Load theme preference and apply it
@@ -79,6 +80,21 @@ const AppContent = () => {
     );
   }
 
+  const handleLoginSuccess = (adminLogin: boolean = false) => {
+    if (adminLogin) {
+      setIsAdmin(true);
+      setCurrentPage('admin-panel');
+    } else {
+      setIsAdmin(false);
+      setCurrentPage('dashboard');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAdmin(false);
+    setCurrentPage('welcome');
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       case 'welcome':
@@ -86,7 +102,6 @@ const AppContent = () => {
           <WelcomePage
             onLoginClick={() => setCurrentPage('login')}
             onRegisterClick={() => setCurrentPage('register')}
-            onAdminClick={() => setCurrentPage('admin-login')}
           />
         );
       
@@ -95,7 +110,7 @@ const AppContent = () => {
           <LoginPage
             onBackClick={() => setCurrentPage('welcome')}
             onForgotPasswordClick={() => setCurrentPage('forgot-password')}
-            onLoginSuccess={() => setCurrentPage('dashboard')}
+            onLoginSuccess={handleLoginSuccess}
           />
         );
       
@@ -139,7 +154,7 @@ const AppContent = () => {
             onJadwalClick={() => setCurrentPage('jadwal')}
             onTugasClick={() => setCurrentPage('tugas')}
             onProfileClick={() => setCurrentPage('profile')}
-            onAdminClick={isAdmin ? () => setCurrentPage('admin-panel') : undefined}
+            onLogout={handleLogout}
           />
         );
       
@@ -164,23 +179,15 @@ const AppContent = () => {
           />
         );
       
-      case 'admin-login':
-        return (
-          <AdminLoginPage
-            onBackClick={() => setCurrentPage('welcome')}
-            onLoginSuccess={() => setCurrentPage('admin-panel')}
-          />
-        );
-      
       case 'admin-panel':
         return (
           <AdminPanel
-            onBackClick={() => setCurrentPage('dashboard')}
+            onBackClick={handleLogout}
           />
         );
       
       default:
-        return <WelcomePage onLoginClick={() => setCurrentPage('login')} onRegisterClick={() => setCurrentPage('register')} onAdminClick={() => setCurrentPage('admin-login')} />;
+        return <WelcomePage onLoginClick={() => setCurrentPage('login')} onRegisterClick={() => setCurrentPage('register')} />;
     }
   };
 
