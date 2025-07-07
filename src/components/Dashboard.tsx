@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,9 +16,10 @@ interface DashboardProps {
   onTugasClick: () => void;
   onProfileClick: () => void;
   onAdminClick?: () => void;
+  onLogout: () => void;
 }
 
-export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick, onAdminClick }: DashboardProps) => {
+export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick, onAdminClick, onLogout }: DashboardProps) => {
   const { user, profile, signOut } = useAuth();
   const [jadwalHariIni, setJadwalHariIni] = useState<JadwalKuliah[]>([]);
   const [tugasRingkasan, setTugasRingkasan] = useState<Tugas[]>([]);
@@ -82,6 +82,7 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick, onAdmin
   const handleLogout = async () => {
     try {
       await signOut();
+      onLogout();
     } catch (error) {
       console.error('Error signing out:', error);
     }
