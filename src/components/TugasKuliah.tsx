@@ -77,7 +77,9 @@ export const TugasKuliah = ({ onBackClick }: TugasKuliahProps) => {
       // Type casting untuk memastikan status sesuai dengan type yang diharapkan
       const typedTugas: Tugas[] = (data || []).map(tugas => ({
         ...tugas,
-        status: tugas.status as 'pending' | 'in_progress' | 'completed'
+        status: tugas.status as 'pending' | 'in_progress' | 'completed',
+        priority: tugas.priority as 'high' | 'medium' | 'low',
+        file_attachments: tugas.file_attachments as any[]
       }));
 
       setTugas(typedTugas);

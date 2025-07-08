@@ -69,7 +69,9 @@ export const Dashboard = ({ onJadwalClick, onTugasClick, onProfileClick, onAdmin
       } else {
         setTugasRingkasan((tugasData || []).map(tugas => ({
           ...tugas,
-          status: tugas.status as 'pending' | 'in_progress' | 'completed'
+          status: tugas.status as 'pending' | 'in_progress' | 'completed',
+          priority: tugas.priority as 'high' | 'medium' | 'low',
+          file_attachments: tugas.file_attachments as any[]
         })));
       }
     } catch (error) {

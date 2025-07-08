@@ -59,7 +59,10 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (data) {
         setIsPremium(true);
-        setSubscription(data);
+        setSubscription({
+          ...data,
+          plan_type: data.plan_type as 'monthly' | 'quarterly' | 'yearly'
+        });
       } else {
         setIsPremium(false);
         setSubscription(null);

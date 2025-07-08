@@ -49,7 +49,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      setProfile(data);
+      setProfile({
+        ...data,
+        language: data.language as 'en' | 'id' | 'zh'
+      });
     } catch (error) {
       console.error('Error fetching profile:', error);
     }

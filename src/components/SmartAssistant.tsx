@@ -42,7 +42,9 @@ export const SmartAssistant = () => {
 
       const tugas: Tugas[] = (tugasResult.data || []).map(t => ({
         ...t,
-        status: t.status as 'pending' | 'in_progress' | 'completed'
+        status: t.status as 'pending' | 'in_progress' | 'completed',
+        priority: t.priority as 'high' | 'medium' | 'low',
+        file_attachments: t.file_attachments as any[]
       }));
       const jadwal: JadwalKuliah[] = jadwalResult.data || [];
 

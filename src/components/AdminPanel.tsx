@@ -63,10 +63,17 @@ export const AdminPanel = ({ onBackClick }: AdminPanelProps) => {
 
       const typedTugas: Tugas[] = (tugasData || []).map(t => ({
         ...t,
-        status: t.status as 'pending' | 'in_progress' | 'completed'
+        status: t.status as 'pending' | 'in_progress' | 'completed',
+        priority: t.priority as 'high' | 'medium' | 'low',
+        file_attachments: t.file_attachments as any[]
       }));
 
-      setUsers(usersData || []);
+      const typedUsers: Profile[] = (usersData || []).map(u => ({
+        ...u,
+        language: u.language as 'en' | 'id' | 'zh'
+      }));
+
+      setUsers(typedUsers);
       setJadwal(jadwalData || []);
       setTugas(typedTugas);
 
